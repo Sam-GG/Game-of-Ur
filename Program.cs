@@ -33,20 +33,28 @@ namespace Ur
         {
             piecesInGoal++;
         }
+
     }
     class GamePiece
     {
         // Gamepieces keep track of movement, so movement counter directly corresponds to index of playermovement array to 
         // get index for gameboard array. For example, If a piece is movement counter 3, and I roll a 2, add 2 to the counter to get 5,
         // and then check index 5 of that players movement array to get the index the piece should move to in the gameboard array.
-        public int playerNum;
+        public Player player;
         public int movementCounter;
         public bool inHand = true;
 
-        public GamePiece(int playerNum)
+        public GamePiece(Player player)
         {
-            this.playerNum = playerNum;
+            this.player = player;
             this.movementCounter = -1;
+        }
+
+        public void captured(){
+            // reset piece after being captured
+            inHand = true;
+            movementCounter = -1;
+            player.piecesInHand++;
         }
     }
     class GameBoard
@@ -84,22 +92,52 @@ namespace Ur
         public void movePiece(Player player, GamePiece piece, int roll)
         {
             piece.movementCounter += roll;
+            int destinationIdx = player.movementPattern[piece.movementCounter];
             // Goal condition
             if (piece.movementCounter > 14)
             {
                 player.pieceRanHome();
             }
-            // typical movement
+            // typical movement and/or capture
             else
             {
-                gameBoard[player.movementPattern[piece.movementCounter]] = piece;
+                // check if space is occupied. detectCollision will return 0 for empty or 1 or 2 for playerNum occupying
+                switch (detectCollision(destinationIdx))
+                {
+                    case 0:
+                        gameBoard[destinationIdx] = piece;
+                        break;
+                    case 1:
+                        if (player.playerNum == 1) { return; }
+                        else{ capturePiece(player, piece, destinationIdx); }
+                        break;
+                    case 2:
+                        if (player.playerNum == 2) { return; }
+                        else { capturePiece(player, piece, destinationIdx); }
+                        break;
+                }
             }
             // remove piece from previous position, provided it was not in hand
             if (piece.inHand) {
                 piece.inHand = false;
+                player.piecesInHand--;
                 return;
             }
             gameBoard[piece.movementCounter - roll] = null;
+        }
+
+        public int detectCollision(int space)
+        // Detects if a space is occupied, and if so, returns the player number of the piece occupying it
+        {
+            if (gameBoard[space] == null)
+                return 0;
+            return gameBoard[space].player.playerNum;
+        }
+
+        public void capturePiece(Player player, GamePiece attackerPiece, int defenderIndex)
+        {
+            gameBoard[defenderIndex].captured();
+            gameBoard[defenderIndex] = attackerPiece;
         }
     }
 }
