@@ -28,6 +28,11 @@ namespace Ur
                 this.movementPattern = new int[] { 14, 15, 16, 17, 6, 7, 8, 9, 10, 11, 12, 13, 19, 18 };
             }
         }
+
+        internal void pieceRanHome()
+        {
+            piecesInGoal++;
+        }
     }
     class GamePiece
     {
@@ -37,12 +42,11 @@ namespace Ur
         public int playerNum;
         public int movementCounter;
         public bool inHand = true;
-        public bool inGoal = false;
 
         public GamePiece(int playerNum)
         {
             this.playerNum = playerNum;
-            this.movementCounter = 0;
+            this.movementCounter = -1;
         }
     }
     class GameBoard
@@ -83,14 +87,18 @@ namespace Ur
             // Goal condition
             if (piece.movementCounter > 14)
             {
-                piece.inGoal = true;
+                player.pieceRanHome();
             }
             // typical movement
             else
             {
                 gameBoard[player.movementPattern[piece.movementCounter]] = piece;
             }
-            // remove piece from previous position
+            // remove piece from previous position, provided it was not in hand
+            if (piece.inHand) {
+                piece.inHand = false;
+                return;
+            }
             gameBoard[piece.movementCounter - roll] = null;
         }
     }
