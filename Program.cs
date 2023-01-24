@@ -88,8 +88,8 @@ namespace Ur
             }
         }
 
-        // Move piece
-        public void movePiece(Player player, GamePiece piece, int roll)
+        // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
+        public int movePiece(Player player, GamePiece piece, int roll)
         {
             piece.movementCounter += roll;
             int destinationIdx = player.movementPattern[piece.movementCounter];
@@ -108,11 +108,17 @@ namespace Ur
                         gameBoard[destinationIdx] = piece;
                         break;
                     case 1:
-                        if (player.playerNum == 1) { return; }
+                        if (player.playerNum == 1) {
+                            piece.movementCounter -= roll;
+                            return 1; 
+                        }
                         else{ capturePiece(player, piece, destinationIdx); }
                         break;
                     case 2:
-                        if (player.playerNum == 2) { return; }
+                        if (player.playerNum == 2){
+                            piece.movementCounter -= roll;
+                            return 1;
+                        }
                         else { capturePiece(player, piece, destinationIdx); }
                         break;
                 }
@@ -121,9 +127,10 @@ namespace Ur
             if (piece.inHand) {
                 piece.inHand = false;
                 player.piecesInHand--;
-                return;
+                return 0;
             }
             gameBoard[piece.movementCounter - roll] = null;
+            return 0;
         }
 
         public int detectCollision(int space)
