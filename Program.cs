@@ -56,7 +56,7 @@ namespace Ur
              █6 ██7 ██8 ██9 ██10██11██12██13█ 
              ████████████████████████████████ 
              ████████████████        ████████ 
-             █14██15██16██17█        █18██19█ 
+             █14██15██16██17█        █18██19█   
              ████████████████        ████████                
         */
 
@@ -68,6 +68,13 @@ namespace Ur
 
         // Boardspaces are either null/empty or Gamepiece
         GamePiece[] gameBoard = new GamePiece[20];
+        public GameBoard()
+        {
+            for (int i = 0; i < gameBoard.Length; i++)
+            {
+                gameBoard[i] = null;
+            }
+        }
 
         // Move piece
         public void movePiece(Player player, GamePiece piece, int roll)
