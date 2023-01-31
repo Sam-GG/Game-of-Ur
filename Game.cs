@@ -8,7 +8,19 @@ namespace Ur
         Player player1;
         Player player2;
         GameBoard gameBoard;
-        
+
+        public int roll()
+        {
+            // returns sum of 4 random numbers of either 0 or 1
+            Random rand = new Random();
+            int roll = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                roll += rand.Next(0, 2);
+            }
+            return roll;
+        }
+
         static void Main(string[] args)
         {
             Game game = new Game();
