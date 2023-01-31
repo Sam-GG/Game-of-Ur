@@ -9,6 +9,14 @@ namespace Ur
         Player player2;
         GameBoard gameBoard;
 
+        public void undoMove()
+        {
+            //TODO: implement undo move
+            // I think an undo last move feature would allow easy generation of possible moves
+            // by utilizing the already in place moving system, checking for return of 0 on move success,
+            // and then undoing the move. could also prove useful later for AI implementation
+        }
+
         public int roll()
         {
             // returns sum of 4 random numbers of either 0 or 1
