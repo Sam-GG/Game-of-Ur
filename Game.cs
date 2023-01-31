@@ -5,10 +5,16 @@ namespace Ur
     
     class Game
     {
+        Player player1;
+        Player player2;
+        GameBoard gameBoard;
         
         static void Main(string[] args)
         {
-            
+            Game game = new Game();
+            game.player1 = new Player(1);
+            game.player2 = new Player(2);
+            game.gameBoard = new GameBoard();
         }
     }
 
