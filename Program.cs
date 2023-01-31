@@ -112,14 +112,14 @@ namespace Ur
                             piece.movementCounter -= roll;
                             return 1; 
                         }
-                        else{ capturePiece(player, piece, destinationIdx); }
+                        else{ capturePiece(piece, destinationIdx); }
                         break;
                     case 2:
                         if (player.playerNum == 2){
                             piece.movementCounter -= roll;
                             return 1;
                         }
-                        else { capturePiece(player, piece, destinationIdx); }
+                        else { capturePiece(piece, destinationIdx); }
                         break;
                 }
             }
@@ -141,7 +141,7 @@ namespace Ur
             return gameBoard[space].player.playerNum;
         }
 
-        public void capturePiece(Player player, GamePiece attackerPiece, int defenderIndex)
+        public void capturePiece(GamePiece attackerPiece, int defenderIndex)
         {
             gameBoard[defenderIndex].captured();
             gameBoard[defenderIndex] = attackerPiece;
