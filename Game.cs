@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Transactions;
 
 namespace Ur
 {
@@ -7,14 +10,37 @@ namespace Ur
     {
         Player player1;
         Player player2;
+        int currentPlayer;
         GameBoard gameBoard;
+
+        // for undoing moves, potentially expensive implementation - but easy
+        Stack<GameBoard> gameStates = new Stack<GameBoard>();
+        Stack<Player> player1States = new Stack<Player>();
+        Stack<Player> player2States = new Stack<Player>();
 
         public void undoMove()
         {
-            //TODO: implement undo move
             // I think an undo last move feature would allow easy generation of possible moves
             // by utilizing the already in place moving system, checking for return of 0 on move success,
             // and then undoing the move. could also prove useful later for AI implementation
+
+            // The easiest way would be to have a stack of gameboard states and player states, and push the current state to the stack each move
+            // Then, when undoing a move, pop the last state off the stack and set the current state to that
+            // However, this could chew up memory, and add some overhead to the game loop. I'll likely start with this now and possibly redo later.
+            if (gameStates.Count > 0)
+            {
+                // Get the previous game states from the stack and restore them
+                gameBoard = gameStates.Pop();
+                player1 = player1States.Pop();
+                player2 = player2States.Pop();
+
+                // Switch the current player to the one who made the previous move
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+            }
+            else
+            {
+                Console.WriteLine("There are no moves to undo.");
+            }
         }
 
         public int roll()
@@ -32,11 +58,16 @@ namespace Ur
         public void playGame()
         {
             // Gameplay loop
-            int currentPlayer = 1;
+            currentPlayer = 1;
             int roll = 0;
             while (player1.piecesInGoal < 7 && player2.piecesInGoal < 7)
             {
                 this.gameBoard.printBoard();
+                // Add the current game state to the stack before making a move
+                gameStates.Push(new GameBoard(gameBoard));
+                player1States.Push(new Player(player1));
+                player2States.Push(new Player(player2));
+
                 // roll
                 roll = this.roll();
                 Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
@@ -48,6 +79,15 @@ namespace Ur
                 // move piece
                 this.gameBoard.movePiece(this.player1, new GamePiece(this.player1), roll);
                 this.gameBoard.printBoard();
+
+                // Testing Undo functionality
+                currentPlayer = 2;
+                Console.WriteLine("Player 2's turn");
+                Console.WriteLine("Undo-ing move");
+                undoMove();
+                Console.WriteLine("Player " + currentPlayer + "'s turn");
+                this.gameBoard.printBoard();
+
                 break;
             }
         }
@@ -78,6 +118,14 @@ namespace Ur
             {
                 this.movementPattern = new int[] { 14, 15, 16, 17, 6, 7, 8, 9, 10, 11, 12, 13, 19, 18 };
             }
+        }
+
+        public Player(Player player)
+        {
+            this.playerNum = player.playerNum;
+            this.movementPattern = player.movementPattern;
+            this.piecesInGoal = player.piecesInGoal;
+            this.piecesInHand = player.piecesInHand;
         }
 
         internal void pieceRanHome()
@@ -131,12 +179,18 @@ namespace Ur
 
         // Boardspaces are either null/empty or Gamepiece
         GamePiece[] gameBoard = new GamePiece[20];
+
         public GameBoard()
         {
             for (int i = 0; i < gameBoard.Length; i++)
             {
                 gameBoard[i] = null;
             }
+        }
+
+        public GameBoard(GameBoard gameBoardTarget)
+        {
+            Array.Copy(gameBoardTarget.gameBoard, this.gameBoard, 20);
         }
 
         public String GameSpaceToSymbol(int idx)
