@@ -29,12 +29,36 @@ namespace Ur
             return roll;
         }
 
+        public void playGame()
+        {
+            // Gameplay loop
+            int currentPlayer = 1;
+            int roll = 0;
+            while (player1.piecesInGoal < 7 && player2.piecesInGoal < 7)
+            {
+                this.gameBoard.printBoard();
+                // roll
+                roll = this.roll();
+                Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
+
+                // gather possible moves
+
+                // determine move
+
+                // move piece
+                this.gameBoard.movePiece(this.player1, new GamePiece(this.player1), roll);
+                this.gameBoard.printBoard();
+                break;
+            }
+        }
+
         static void Main(string[] args)
         {
             Game game = new Game();
             game.player1 = new Player(1);
             game.player2 = new Player(2);
             game.gameBoard = new GameBoard();
+            game.playGame();
         }
     }
 
@@ -115,8 +139,36 @@ namespace Ur
             }
         }
 
-        // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
-        public int movePiece(Player player, GamePiece piece, int roll)
+        public String GameSpaceToSymbol(int idx)
+        {
+            // returns symbol for gameboard space
+            if (gameBoard[idx] == null)
+            {
+                return " ";
+            }
+            else
+            {
+                return gameBoard[idx].player.playerNum.ToString();
+            }
+        }
+
+        public void printBoard()
+        {
+            // lazy way to print board for now
+            Console.WriteLine("████████████████        ████████");
+            Console.WriteLine("█"+ GameSpaceToSymbol(0) +" ██" + GameSpaceToSymbol(1) + " ██"+ GameSpaceToSymbol(2)+" ██"+GameSpaceToSymbol(3)+" █        █" + GameSpaceToSymbol(4) + " ██" + GameSpaceToSymbol(5) + " █");
+            Console.WriteLine("████████████████        ████████");
+            Console.WriteLine("████████████████████████████████");
+            Console.WriteLine("█" + GameSpaceToSymbol(6) + " ██" + GameSpaceToSymbol(7) + " ██" + GameSpaceToSymbol(8) + " ██" + GameSpaceToSymbol(9) + " ██" + GameSpaceToSymbol(10) + " ██" + GameSpaceToSymbol(11) + " ██" + GameSpaceToSymbol(12) + " ██" + GameSpaceToSymbol(13) + " █");
+            Console.WriteLine("████████████████████████████████");
+            Console.WriteLine("████████████████        ████████");
+            Console.WriteLine("█" + GameSpaceToSymbol(14) + " ██" + GameSpaceToSymbol(15) + " ██" + GameSpaceToSymbol(16) + " ██" + GameSpaceToSymbol(17) + " █        █" + GameSpaceToSymbol(18) + " ██" + GameSpaceToSymbol(19) + " █");
+            Console.WriteLine("████████████████        ████████"); 
+
+        }
+
+            // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
+            public int movePiece(Player player, GamePiece piece, int roll)
         {
             piece.movementCounter += roll;
             int destinationIdx = player.movementPattern[piece.movementCounter];
@@ -175,3 +227,4 @@ namespace Ur
         }
     }
 }
+    
