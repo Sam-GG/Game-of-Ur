@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.InteropServices;
 using System.Transactions;
 
@@ -222,8 +223,12 @@ namespace Ur
         }
 
             // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
-            public int movePiece(Player player, GamePiece piece, int roll)
+        public int movePiece(Player player, GamePiece piece, int roll)
         {
+            if (roll == 0)
+            {
+                return 0;
+            }
             piece.movementCounter += roll;
             int destinationIdx = player.movementPattern[piece.movementCounter];
             // Goal condition
