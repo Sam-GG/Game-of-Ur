@@ -56,6 +56,11 @@ namespace Ur
             return roll;
         }
 
+        public Player getCurrentPlayer()
+        {
+            return (currentPlayer == 1) ? player1 : player2;
+        }
+
         public void playGame()
         {
             // Gameplay loop
@@ -63,33 +68,59 @@ namespace Ur
             int roll = 0;
             while (player1.piecesInGoal < 7 && player2.piecesInGoal < 7)
             {
-                this.gameBoard.printBoard();
                 // Add the current game state to the stack before making a move
                 gameStates.Push(new GameBoard(gameBoard));
                 player1States.Push(new Player(player1));
                 player2States.Push(new Player(player2));
 
+                // clear terminal
+                Console.Clear();
+
                 // roll
                 roll = this.roll();
                 Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
 
-                // gather possible moves
+                // If A.I.
+                    // gather possible moves
+                    // determine move
 
-                // determine move
+                // Show board
+                gameBoard.printBoard();
 
-                // move piece
-                this.gameBoard.movePiece(this.player1, new GamePiece(this.player1), roll);
-                this.gameBoard.printBoard();
+                // ask and execute human move
+                humanMove(roll);
 
-                // Testing Undo functionality
-                currentPlayer = 2;
-                Console.WriteLine("Player 2's turn");
-                Console.WriteLine("Undo-ing move");
-                undoMove();
-                Console.WriteLine("Player " + currentPlayer + "'s turn");
-                this.gameBoard.printBoard();
+                // switch player
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+            }
+        }
 
-                break;
+        public void humanMove(int roll)
+        {
+            int result;
+            // get move
+            Console.WriteLine("Which piece do you want to move? Type index of piece (for placing new type 'new')");
+            String pieceIndex = Console.ReadLine();
+
+            // move piece
+            if (pieceIndex == "new")
+            {
+                result = gameBoard.movePiece(getCurrentPlayer(), new GamePiece(getCurrentPlayer()), roll);
+            }
+            else
+            {
+                if (gameBoard.getPiece(int.Parse(pieceIndex)) == null)
+                {
+                    Console.WriteLine("Please choose a legal move.");
+                    humanMove(roll);
+                    return;
+                }
+                result = gameBoard.movePiece(getCurrentPlayer(), gameBoard.getPiece(int.Parse(pieceIndex)), roll);
+            }
+            if (result == 1)
+            {
+                Console.WriteLine("Please choose a legal move.");
+                humanMove(roll);
             }
         }
 
@@ -194,6 +225,14 @@ namespace Ur
             Array.Copy(gameBoardTarget.gameBoard, this.gameBoard, 20);
         }
 
+        public GamePiece getPiece(int idx)
+        {
+            if (gameBoard[idx] == null) {
+                Console.WriteLine("Error, no piece at index " + idx + "");
+            }
+            return gameBoard[idx];
+        }
+
         public String GameSpaceToSymbol(int idx)
         {
             // returns symbol for gameboard space
@@ -267,7 +306,8 @@ namespace Ur
                 player.piecesInHand--;
                 return 0;
             }
-            gameBoard[piece.movementCounter - roll] = null;
+            // need to translate movement counter back to index in movement pattern array to address the correct gameboard index
+            gameBoard[piece.player.movementPattern[piece.movementCounter - roll]] = null;
             return 0;
         }
 
