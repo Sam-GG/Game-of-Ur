@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Transactions;
 
@@ -19,6 +20,13 @@ namespace Ur
         Stack<Player> player1States = new Stack<Player>();
         Stack<Player> player2States = new Stack<Player>();
 
+        public void updateStacks()
+        {
+            // Add the current game state to the stack
+            gameStates.Push(new GameBoard(gameBoard));
+            player1States.Push(new Player(player1));
+            player2States.Push(new Player(player2));
+        }
         public void undoMove()
         {
             // I think an undo last move feature would allow easy generation of possible moves
@@ -34,9 +42,6 @@ namespace Ur
                 gameBoard = gameStates.Pop();
                 player1 = player1States.Pop();
                 player2 = player2States.Pop();
-
-                // Switch the current player to the one who made the previous move
-                currentPlayer = (currentPlayer == 1) ? 2 : 1;
             }
             else
             {
@@ -44,6 +49,45 @@ namespace Ur
             }
         }
 
+        public List<int> getPossibleMoves(Player player, int roll)
+        {
+            List<int> possibleMoves = new List<int>();
+            // if roll is 0, return empty list
+            if (roll == 0)
+            {
+                return possibleMoves;
+            }
+            // check if any of the players onboard pieces can be moved
+            foreach (int idx in gameBoard.getPlayerPieceIndexes(player))
+            {
+                try
+                {
+                    // move the piece, and if its successful add its index to the list and then undo the move
+                    updateStacks();
+                    int result = gameBoard.movePiece(player, gameBoard.getPiece(idx), roll);
+                    if (result == 0)
+                    {
+                        possibleMoves.Add(idx);
+                        undoMove();
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.ToString());
+                }
+            }
+            // check if the player can place a piece
+            if (player.piecesInHand > 0)
+            {
+                updateStacks();
+                int result = gameBoard.movePiece(player, new GamePiece(player), roll);
+                if (result == 0) {
+                    possibleMoves.Add(-1);
+                    undoMove();
+                }
+            }
+            return possibleMoves;
+        }
         public int roll()
         {
             // returns sum of 4 random numbers of either 0 or 1
@@ -61,6 +105,11 @@ namespace Ur
             return (currentPlayer == 1) ? player1 : player2;
         }
 
+        public void changeTurns()
+        {
+            currentPlayer = (currentPlayer == 1) ? 2 : 1;
+        }
+
         public void playGame()
         {
             // Gameplay loop
@@ -69,9 +118,7 @@ namespace Ur
             while (player1.piecesInGoal < 7 && player2.piecesInGoal < 7)
             {
                 // Add the current game state to the stack before making a move
-                gameStates.Push(new GameBoard(gameBoard));
-                player1States.Push(new Player(player1));
-                player2States.Push(new Player(player2));
+                updateStacks();
 
                 // clear terminal
                 Console.Clear();
@@ -80,9 +127,16 @@ namespace Ur
                 roll = this.roll();
                 Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
 
-                // If A.I.
-                    // gather possible moves
-                    // determine move
+                // gather possible moves
+                List<int> possibleMoves = getPossibleMoves(getCurrentPlayer(), roll);
+                if (possibleMoves.Count == 0)
+                {
+                    Console.WriteLine("Player " + currentPlayer + " has no legal moves. Skipping turn.");
+                    changeTurns();
+                    continue;
+                }
+
+                // If A.I. determine move
 
                 // Show board
                 gameBoard.printBoard();
@@ -90,8 +144,7 @@ namespace Ur
                 // ask and execute human move
                 humanMove(roll);
 
-                // switch player
-                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+                changeTurns();
             }
         }
 
@@ -187,6 +240,14 @@ namespace Ur
             movementCounter = -1;
             player.piecesInHand++;
         }
+
+        internal GamePiece Clone()
+        {
+            GamePiece piece = new GamePiece(player);
+            piece.movementCounter = this.movementCounter;
+            piece.inHand = this.inHand;
+            return piece;
+        }
     }
     class GameBoard
     {
@@ -220,9 +281,21 @@ namespace Ur
             }
         }
 
+        public List<int> getPlayerPieceIndexes(Player player)
+        {
+            List<int> playerPieceIndexes = new List<int>();
+            for (int i = 0; i < gameBoard.Length; i++)
+            {
+                if (gameBoard[i] != null && gameBoard[i].player.playerNum == player.playerNum)
+                {
+                    playerPieceIndexes.Add(i);
+                }
+            }
+            return playerPieceIndexes;
+        }
         public GameBoard(GameBoard gameBoardTarget)
         {
-            Array.Copy(gameBoardTarget.gameBoard, this.gameBoard, 20);
+            this.gameBoard = gameBoardTarget.gameBoard.Select(a => a != null ? (GamePiece)a.Clone() : null).ToArray();
         }
 
         public GamePiece getPiece(int idx)
@@ -289,14 +362,18 @@ namespace Ur
                             piece.movementCounter -= roll;
                             return 1; 
                         }
-                        else{ capturePiece(piece, destinationIdx); }
+                        else{ 
+                            capturePiece(piece, destinationIdx);
+                        }
                         break;
                     case 2:
                         if (player.playerNum == 2){
                             piece.movementCounter -= roll;
                             return 1;
                         }
-                        else { capturePiece(piece, destinationIdx); }
+                        else { 
+                            capturePiece(piece, destinationIdx);
+                        }
                         break;
                 }
             }
@@ -307,7 +384,7 @@ namespace Ur
                 return 0;
             }
             // need to translate movement counter back to index in movement pattern array to address the correct gameboard index
-            gameBoard[piece.player.movementPattern[piece.movementCounter - roll]] = null;
+            gameBoard[player.movementPattern[piece.movementCounter - roll]] = null;
             return 0;
         }
 
