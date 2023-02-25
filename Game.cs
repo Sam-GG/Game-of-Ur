@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Transactions;
 
@@ -64,7 +65,7 @@ namespace Ur
                 {
                     // move the piece, and if its successful add its index to the list and then undo the move
                     updateStacks();
-                    int result = gameBoard.movePiece(player, gameBoard.getPiece(idx), roll);
+                    int result = gameBoard.movePiece(player, getOppositePlayer(player), gameBoard.getPiece(idx), roll);
                     if (result == 0)
                     {
                         possibleMoves.Add(idx);
@@ -80,7 +81,7 @@ namespace Ur
             if (player.piecesInHand > 0)
             {
                 updateStacks();
-                int result = gameBoard.movePiece(player, new GamePiece(player), roll);
+                int result = gameBoard.movePiece(player, getOppositePlayer(player), new GamePiece(player), roll);
                 if (result == 0) {
                     possibleMoves.Add(-1);
                     undoMove();
@@ -105,6 +106,11 @@ namespace Ur
             return (currentPlayer == 1) ? player1 : player2;
         }
 
+        public Player getOppositePlayer(Player player)
+        {
+            return (player.playerNum == player1.playerNum) ? player2 : player1;
+        }
+
         public void changeTurns()
         {
             currentPlayer = (currentPlayer == 1) ? 2 : 1;
@@ -123,6 +129,10 @@ namespace Ur
                 // clear terminal
                 Console.Clear();
 
+                // output game info
+                Console.WriteLine("Player 1 has " + player1.piecesInGoal + " pieces in goal and " + player1.piecesInHand + " pieces in hand.");
+                Console.WriteLine("Player 2 has " + player2.piecesInGoal + " pieces in goal and " + player2.piecesInHand + " pieces in hand.");
+
                 // roll
                 roll = this.roll();
                 Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
@@ -132,6 +142,7 @@ namespace Ur
                 if (possibleMoves.Count == 0)
                 {
                     Console.WriteLine("Player " + currentPlayer + " has no legal moves. Skipping turn.");
+                    System.Threading.Thread.Sleep(1500);
                     changeTurns();
                     continue;
                 }
@@ -158,7 +169,7 @@ namespace Ur
             // move piece
             if (pieceIndex == "new")
             {
-                result = gameBoard.movePiece(getCurrentPlayer(), new GamePiece(getCurrentPlayer()), roll);
+                result = gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), new GamePiece(getCurrentPlayer()), roll);
             }
             else
             {
@@ -168,7 +179,7 @@ namespace Ur
                     humanMove(roll);
                     return;
                 }
-                result = gameBoard.movePiece(getCurrentPlayer(), gameBoard.getPiece(int.Parse(pieceIndex)), roll);
+                result = gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), gameBoard.getPiece(int.Parse(pieceIndex)), roll);
             }
             if (result == 1)
             {
@@ -237,8 +248,8 @@ namespace Ur
         public void captured(){
             // reset piece after being captured
             inHand = true;
-            movementCounter = -1;
-            player.piecesInHand++;
+            movementCounter = -1; 
+            // player.piecesInHand += 1;
         }
 
         internal GamePiece Clone()
@@ -271,7 +282,7 @@ namespace Ur
 
 
         // Boardspaces are either null/empty or Gamepiece
-        GamePiece[] gameBoard = new GamePiece[20];
+        public GamePiece[] gameBoard = new GamePiece[20];
 
         public GameBoard()
         {
@@ -335,7 +346,7 @@ namespace Ur
         }
 
             // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
-        public int movePiece(Player player, GamePiece piece, int roll)
+        public int movePiece(Player player, Player opponent, GamePiece piece, int roll)
         {
             if (roll == 0)
             {
@@ -364,6 +375,7 @@ namespace Ur
                         }
                         else{ 
                             capturePiece(piece, destinationIdx);
+                            opponent.piecesInHand++;
                         }
                         break;
                     case 2:
@@ -373,6 +385,7 @@ namespace Ur
                         }
                         else { 
                             capturePiece(piece, destinationIdx);
+                            opponent.piecesInHand++;
                         }
                         break;
                 }
