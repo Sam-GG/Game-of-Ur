@@ -154,8 +154,15 @@ namespace Ur
 
                 // ask and execute human move
                 humanMove(roll);
-
-                changeTurns();
+                if (getCurrentPlayer().hasDouble)
+                {
+                    Console.WriteLine("Double Roll! Go again.");
+                    System.Threading.Thread.Sleep(1500);
+                }
+                else
+                {
+                    changeTurns();
+                }
             }
         }
 
@@ -204,9 +211,12 @@ namespace Ur
         public int[] movementPattern;
         public int piecesInGoal = 0;
         public int piecesInHand = 7;
+        internal bool hasDouble;
+
         public Player(int playerNum)
         {
             this.playerNum = playerNum;
+            this.hasDouble = false;
             if (playerNum == 1)
             {
                 this.movementPattern = new int[] { 0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 5, 4 };
@@ -222,6 +232,7 @@ namespace Ur
             this.movementPattern = player.movementPattern;
             this.piecesInGoal = player.piecesInGoal;
             this.piecesInHand = player.piecesInHand;
+            this.hasDouble = player.hasDouble;
         }
 
         internal void pieceRanHome()
@@ -345,9 +356,13 @@ namespace Ur
 
         }
 
-            // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
+        // Move piece. returns 0 on successful movement or capture of piece, and 1 on inability to move piece.
         public int movePiece(Player player, Player opponent, GamePiece piece, int roll)
         {
+            if (player.hasDouble)
+            {
+                player.hasDouble = false;
+            }
             if (roll == 0)
             {
                 return 0;
@@ -371,24 +386,28 @@ namespace Ur
                     case 1:
                         if (player.playerNum == 1) {
                             piece.movementCounter -= roll;
-                            return 1; 
+                            return 1;
                         }
-                        else{ 
+                        else {
                             capturePiece(piece, destinationIdx);
                             opponent.piecesInHand++;
                         }
                         break;
                     case 2:
-                        if (player.playerNum == 2){
+                        if (player.playerNum == 2) {
                             piece.movementCounter -= roll;
                             return 1;
                         }
-                        else { 
+                        else {
                             capturePiece(piece, destinationIdx);
                             opponent.piecesInHand++;
                         }
                         break;
                 }
+            }
+            // if destination happens to be a double roll sqaure
+            if (new HashSet<int> { 3, 4, 9, 17, 18 }.Contains(destinationIdx)) {
+                player.hasDouble = true;
             }
             // remove piece from previous position, provided it was not in hand
             if (piece.inHand) {
