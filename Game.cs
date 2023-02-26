@@ -384,17 +384,17 @@ namespace Ur
                         gameBoard[destinationIdx] = piece;
                         break;
                     case 1:
-                        if (player.playerNum == 1) {
+                        if (player.playerNum == 1 || destinationIdx == 9) {
                             piece.movementCounter -= roll;
                             return 1;
                         }
-                        else {
+                        else{
                             capturePiece(piece, destinationIdx);
                             opponent.piecesInHand++;
                         }
                         break;
                     case 2:
-                        if (player.playerNum == 2) {
+                        if (player.playerNum == 2 || destinationIdx == 9) {
                             piece.movementCounter -= roll;
                             return 1;
                         }
