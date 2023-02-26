@@ -164,6 +164,7 @@ namespace Ur
                     changeTurns();
                 }
             }
+            Console.WriteLine("Game Complete.");
         }
 
         public void humanMove(int roll)
@@ -178,7 +179,7 @@ namespace Ur
             {
                 result = gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), new GamePiece(getCurrentPlayer()), roll);
             }
-            else
+            else if (int.TryParse(pieceIndex, out int value))
             {
                 if (gameBoard.getPiece(int.Parse(pieceIndex)) == null)
                 {
@@ -187,6 +188,12 @@ namespace Ur
                     return;
                 }
                 result = gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), gameBoard.getPiece(int.Parse(pieceIndex)), roll);
+            }
+            else
+            {
+                Console.WriteLine("Entered Illegal input.");
+                humanMove(roll);
+                return;
             }
             if (result == 1)
             {
