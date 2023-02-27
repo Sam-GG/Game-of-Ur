@@ -147,13 +147,29 @@ namespace Ur
                     continue;
                 }
 
-                // If A.I. determine move
-
                 // Show board
                 gameBoard.printBoard();
 
-                // ask and execute human move
-                humanMove(roll);
+                // If A.I. determine move
+                if (currentPlayer == 2)
+                {
+                    System.Threading.Thread.Sleep(1500);
+                    Random rand = new Random();
+                    int move = possibleMoves[rand.Next(0, possibleMoves.Count)];
+                    if (move == -1)
+                    {
+                        gameBoard.movePiece(player2, player1, new GamePiece(player2), roll);
+                    }else
+                    {
+                        gameBoard.movePiece(player2, player1, gameBoard.getPiece(move), roll);
+                    }
+                }
+                else
+                {
+                    // ask and execute human move
+                    humanMove(roll);
+                }
+
                 if (getCurrentPlayer().hasDouble)
                 {
                     Console.WriteLine("Double Roll! Go again.");
@@ -374,43 +390,49 @@ namespace Ur
             {
                 return 0;
             }
+
             piece.movementCounter += roll;
-            int destinationIdx = player.movementPattern[piece.movementCounter];
             // Goal condition
-            if (piece.movementCounter > 14)
+            if (piece.movementCounter == 14)
             {
                 player.pieceRanHome();
+                gameBoard[player.movementPattern[piece.movementCounter - roll]] = null;
+                return 0;
             }
+            else if (piece.movementCounter > 14) {
+                piece.movementCounter -= roll;
+                return 1;
+            }
+            // translate destination index
+            int destinationIdx = player.movementPattern[piece.movementCounter];
+
             // typical movement and/or capture
-            else
+            // check if space is occupied. detectCollision will return 0 for empty or 1 or 2 for playerNum occupying
+            switch (detectCollision(destinationIdx))
             {
-                // check if space is occupied. detectCollision will return 0 for empty or 1 or 2 for playerNum occupying
-                switch (detectCollision(destinationIdx))
-                {
-                    case 0:
-                        gameBoard[destinationIdx] = piece;
-                        break;
-                    case 1:
-                        if (player.playerNum == 1 || destinationIdx == 9) {
-                            piece.movementCounter -= roll;
-                            return 1;
-                        }
-                        else{
-                            capturePiece(piece, destinationIdx);
-                            opponent.piecesInHand++;
-                        }
-                        break;
-                    case 2:
-                        if (player.playerNum == 2 || destinationIdx == 9) {
-                            piece.movementCounter -= roll;
-                            return 1;
-                        }
-                        else {
-                            capturePiece(piece, destinationIdx);
-                            opponent.piecesInHand++;
-                        }
-                        break;
-                }
+                case 0:
+                    gameBoard[destinationIdx] = piece;
+                    break;
+                case 1:
+                    if (player.playerNum == 1 || destinationIdx == 9) {
+                        piece.movementCounter -= roll;
+                        return 1;
+                    }
+                    else{
+                        capturePiece(piece, destinationIdx);
+                        opponent.piecesInHand++;
+                    }
+                    break;
+                case 2:
+                    if (player.playerNum == 2 || destinationIdx == 9) {
+                        piece.movementCounter -= roll;
+                        return 1;
+                    }
+                    else {
+                        capturePiece(piece, destinationIdx);
+                        opponent.piecesInHand++;
+                    }
+                    break;
             }
             // if destination happens to be a double roll sqaure
             if (new HashSet<int> { 3, 4, 9, 17, 18 }.Contains(destinationIdx)) {
