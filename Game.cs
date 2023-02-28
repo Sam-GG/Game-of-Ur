@@ -123,8 +123,11 @@ namespace Ur
         public void playGame()
         {
             // ZeroMQ setup for IPC between .Net and Python
-            var socket = new NetMQ.Sockets.PushSocket();
-            socket.Bind("tcp://localhost:4976");    // not actually tcp, but pretends to be and is very fast
+            var pushSocket = new NetMQ.Sockets.PushSocket();
+            pushSocket.Bind("tcp://localhost:4976");    // not actually tcp, but pretends to be and is very fast
+
+            var pullSocket = new NetMQ.Sockets.PullSocket();
+            pullSocket.Connect("tcp://localhost:4977");
 
             // Gameplay loop
             currentPlayer = 1;
@@ -156,9 +159,13 @@ namespace Ur
                 }
 
                 // compile and send game state to python client for neural network 
-                socket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
+                pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
                     getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
                     getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
+
+                // receive move from python client
+                string networkMove = pullSocket.ReceiveFrameString();
+                Console.WriteLine("Received move: " + networkMove);
 
                 // Show board
                 gameBoard.printBoard();
