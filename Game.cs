@@ -2,9 +2,13 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
+using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.ServiceModel.Channels;
 using System.Transactions;
+using NetMQ;
+using NetMQ.Sockets;
 
 namespace Ur
 {
@@ -118,6 +122,10 @@ namespace Ur
 
         public void playGame()
         {
+            // ZeroMQ setup for IPC between .Net and Python
+            var socket = new NetMQ.Sockets.PushSocket();
+            socket.Bind("tcp://localhost:4976");    // not actually tcp, but pretends to be and is very fast
+
             // Gameplay loop
             currentPlayer = 1;
             int roll = 0;
@@ -147,27 +155,25 @@ namespace Ur
                     continue;
                 }
 
+                // compile and send game state to python client for neural network 
+                socket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
+                    getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
+                    getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
+
                 // Show board
                 gameBoard.printBoard();
 
-                // If A.I. determine move
-                if (currentPlayer == 2)
+                // A.I. vs A.I.
+                System.Threading.Thread.Sleep(1500);
+                Random rand = new Random();
+                int move = possibleMoves[rand.Next(0, possibleMoves.Count)];
+                if (move == -1)
                 {
-                    System.Threading.Thread.Sleep(1500);
-                    Random rand = new Random();
-                    int move = possibleMoves[rand.Next(0, possibleMoves.Count)];
-                    if (move == -1)
-                    {
-                        gameBoard.movePiece(player2, player1, new GamePiece(player2), roll);
-                    }else
-                    {
-                        gameBoard.movePiece(player2, player1, gameBoard.getPiece(move), roll);
-                    }
+                    gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), new GamePiece(getCurrentPlayer()), roll);
                 }
                 else
                 {
-                    // ask and execute human move
-                    humanMove(roll);
+                    gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), gameBoard.getPiece(move), roll);
                 }
 
                 if (getCurrentPlayer().hasDouble)
@@ -179,8 +185,31 @@ namespace Ur
                 {
                     changeTurns();
                 }
+
+
+                // A.I. vs Human
+                /*if (currentPlayer == 2)
+                {
+                    System.Threading.Thread.Sleep(1500);
+                    Random rand = new Random();
+                    int move = possibleMoves[rand.Next(0, possibleMoves.Count)];
+                    if (move == -1)
+                    {
+                        gameBoard.movePiece(player2, player1, new GamePiece(player2), roll);
+                    }
+                    else
+                    {
+                        gameBoard.movePiece(player2, player1, gameBoard.getPiece(move), roll);
+                    }
+                }
+                else
+                {
+                    // ask and execute human move
+                    humanMove(roll);
+                }*/
             }
-            Console.WriteLine("Game Complete.");
+            int winner = (player1.piecesInGoal > player2.piecesInGoal) ? player1.playerNum : player2.playerNum;
+            Console.WriteLine("Game Complete. Player " + winner + " wins.");
         }
 
         public void humanMove(int roll)
@@ -337,6 +366,23 @@ namespace Ur
                 }
             }
             return playerPieceIndexes;
+        }
+
+        public int[] getBoardasInt()
+        {
+            int[] boardAsInt = new int[20];
+            for (int i = 0; i < gameBoard.Length; i++)
+            {
+                if (gameBoard[i] == null)
+                {
+                    boardAsInt[i] = 0;
+                }
+                else
+                {
+                    boardAsInt[i] = gameBoard[i].player.playerNum;
+                }
+            }
+            return boardAsInt;
         }
         public GameBoard(GameBoard gameBoardTarget)
         {
