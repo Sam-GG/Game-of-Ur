@@ -153,7 +153,7 @@ namespace Ur
                 if (possibleMoves.Count == 0)
                 {
                     Console.WriteLine("Player " + currentPlayer + " has no legal moves. Skipping turn.");
-                    System.Threading.Thread.Sleep(1500);
+                    //System.Threading.Thread.Sleep(1500);
                     changeTurns();
                     continue;
                 }
@@ -162,18 +162,26 @@ namespace Ur
                 pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
                     getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
                     getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
+                pushSocket.SendFrame(string.Join(",", possibleMoves));
 
                 // receive move from python client
                 string networkMove = pullSocket.ReceiveFrameString();
                 Console.WriteLine("Received move: " + networkMove);
+                int move = Int32.Parse(networkMove);
 
                 // Show board
                 gameBoard.printBoard();
 
                 // A.I. vs A.I.
-                System.Threading.Thread.Sleep(1500);
-                Random rand = new Random();
-                int move = possibleMoves[rand.Next(0, possibleMoves.Count)];
+                //System.Threading.Thread.Sleep(1500);
+
+                //Calculate reward and done
+                int reward = 0;
+                bool done = false;
+                int currentPlayerScore = getCurrentPlayer().piecesInGoal;
+                int oppositePlayerScore = getOppositePlayer(getCurrentPlayer()).piecesInGoal;
+
+                // perform move
                 if (move == -1)
                 {
                     gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), new GamePiece(getCurrentPlayer()), roll);
@@ -182,11 +190,33 @@ namespace Ur
                 {
                     gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), gameBoard.getPiece(move), roll);
                 }
+                
+                // simple short-term memory reward system, revamp later
+                if (currentPlayerScore < getCurrentPlayer().piecesInGoal)
+                {
+                    reward = 1;
+                }
+
+                // check if game is over
+                if (getCurrentPlayer().piecesInGoal == 7)
+                {
+                    done = true;
+                }
+
+                // send reward and done to python client
+                pushSocket.SendFrame(reward.ToString());
+                pushSocket.SendFrame(done.ToString());
+
+                // send new game state to python client
+                pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
+                    getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
+                    getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
+                pushSocket.SendFrame(string.Join(",", possibleMoves));
 
                 if (getCurrentPlayer().hasDouble)
                 {
                     Console.WriteLine("Double Roll! Go again.");
-                    System.Threading.Thread.Sleep(1500);
+                    //System.Threading.Thread.Sleep(1500);
                 }
                 else
                 {
