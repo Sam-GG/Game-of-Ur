@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.ServiceModel.Channels;
 using System.Transactions;
 using NetMQ;
@@ -120,7 +121,7 @@ namespace Ur
             currentPlayer = (currentPlayer == 1) ? 2 : 1;
         }
 
-        public void playGame()
+        public int playGame()
         {
             // ZeroMQ setup for IPC between .Net and Python
             var pushSocket = new NetMQ.Sockets.PushSocket();
@@ -138,39 +139,44 @@ namespace Ur
                 updateStacks();
 
                 // clear terminal
-                Console.Clear();
+                //Console.Clear();
 
                 // output game info
-                Console.WriteLine("Player 1 has " + player1.piecesInGoal + " pieces in goal and " + player1.piecesInHand + " pieces in hand.");
-                Console.WriteLine("Player 2 has " + player2.piecesInGoal + " pieces in goal and " + player2.piecesInHand + " pieces in hand.");
+                //Console.WriteLine("Player 1 has " + player1.piecesInGoal + " pieces in goal and " + player1.piecesInHand + " pieces in hand.");
+                //Console.WriteLine("Player 2 has " + player2.piecesInGoal + " pieces in goal and " + player2.piecesInHand + " pieces in hand.");
 
                 // roll
                 roll = this.roll();
-                Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
+                //Console.WriteLine("Player " + currentPlayer + " rolled a " + roll);
 
                 // gather possible moves
                 List<int> possibleMoves = getPossibleMoves(getCurrentPlayer(), roll);
                 if (possibleMoves.Count == 0)
                 {
-                    Console.WriteLine("Player " + currentPlayer + " has no legal moves. Skipping turn.");
+                    //Console.WriteLine("Player " + currentPlayer + " has no legal moves. Skipping turn.");
                     //System.Threading.Thread.Sleep(1500);
                     changeTurns();
                     continue;
                 }
 
-                // compile and send game state to python client for neural network 
-                pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
-                    getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
-                    getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
-                pushSocket.SendFrame(string.Join(",", possibleMoves));
-
-                // receive move from python client
-                string networkMove = pullSocket.ReceiveFrameString();
-                Console.WriteLine("Received move: " + networkMove);
-                int move = Int32.Parse(networkMove);
-
+                int move;
+                if (currentPlayer == 1)
+                {
+                    // compile and send game state to python client for neural network 
+                    sendState(pushSocket, roll, possibleMoves);
+                    // receive move from python client
+                    string networkMove = pullSocket.ReceiveFrameString();
+                    //Console.WriteLine("Received move: " + networkMove);
+                    move = Int32.Parse(networkMove);
+                }
+                else
+                {
+                    // P2 random move
+                    Random random = new Random();
+                    move = possibleMoves[random.Next(0, possibleMoves.Count)];
+                }
                 // Show board
-                gameBoard.printBoard();
+                //gameBoard.printBoard();
 
                 // A.I. vs A.I.
                 //System.Threading.Thread.Sleep(1500);
@@ -179,7 +185,6 @@ namespace Ur
                 int reward = 0;
                 bool done = false;
                 int currentPlayerScore = getCurrentPlayer().piecesInGoal;
-                int oppositePlayerScore = getOppositePlayer(getCurrentPlayer()).piecesInGoal;
 
                 // perform move
                 if (move == -1)
@@ -203,19 +208,19 @@ namespace Ur
                     done = true;
                 }
 
-                // send reward and done to python client
-                pushSocket.SendFrame(reward.ToString());
-                pushSocket.SendFrame(done.ToString());
+                if (currentPlayer == 1)
+                {
+                    // send reward and done to python client
+                    pushSocket.SendFrame(reward.ToString());
+                    pushSocket.SendFrame(done.ToString());
 
-                // send new game state to python client
-                pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
-                    getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
-                    getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
-                pushSocket.SendFrame(string.Join(",", possibleMoves));
+                    // send new game state to python client
+                    sendState(pushSocket, roll, possibleMoves);
+                }
 
                 if (getCurrentPlayer().hasDouble)
                 {
-                    Console.WriteLine("Double Roll! Go again.");
+                    //Console.WriteLine("Double Roll! Go again.");
                     //System.Threading.Thread.Sleep(1500);
                 }
                 else
@@ -246,8 +251,67 @@ namespace Ur
                 }*/
             }
             int winner = (player1.piecesInGoal > player2.piecesInGoal) ? player1.playerNum : player2.playerNum;
-            Console.WriteLine("Game Complete. Player " + winner + " wins.");
+            pushSocket.Unbind("tcp://localhost:4976");
+            pushSocket.Close();
+            pullSocket.Close();
+            return winner;
         }
+
+        public void sendState(PushSocket pushSocket, int roll, List<int> possibleMoves)
+        {
+            // compile and send game state to python client for neural network 
+            pushSocket.SendFrame(string.Join("", gameBoard.getBoardasInt()) + roll +
+                getCurrentPlayer().piecesInGoal + getCurrentPlayer().piecesInHand +
+                getOppositePlayer(getCurrentPlayer()).piecesInGoal + getOppositePlayer(getCurrentPlayer()).piecesInHand);
+            pushSocket.SendFrame(string.Join(",", possibleMoves));
+        }
+
+// DOESN"T ACCOUNT FOR OTHER PLAYERS MOVE
+/*        public double evaluateMove(int move, int roll)
+        {
+            // both positive and negative score is calculated here. e.g. if a point is scored, +8. If a piece is sent back to hand, -1
+            // or enemy point scored, -8. If enemy piece is sent back to hand, +1
+            // DONT UNDO MOVE. PERFORM, EVALUATE, AND LEAVE IT
+            int before = getCurrentPlayer().piecesInGoal;
+            if (move == -1)
+            {
+                gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), new GamePiece(getCurrentPlayer()), roll);
+            }
+            else
+            {
+                gameBoard.movePiece(getCurrentPlayer(), getOppositePlayer(getCurrentPlayer()), gameBoard.getPiece(move), roll);
+            }
+            return 10*(getCurrentPlayer().piecesInGoal - before);
+        }
+
+        public double bestMoveSearch(List<int> possibleMoves, int roll, double score=0.0, int depth = 5)
+        {
+            //TODO: store gamestate evalutations in a hashmap for constant time calculation
+            if (depth == 0)
+            {
+                return score;
+            }
+            if (possibleMoves.Count == 0)
+            {
+                return score;
+            }
+            depth--;
+            double[] moveScores = new double[possibleMoves.Count];
+            for (int i = 0; i < possibleMoves.Count; i++)
+            {
+                moveScores[i] = evaluateMove(possibleMoves[i], roll);
+                score += moveScores[i];
+                // add up calls for possible rolls multiplied by their respective probability and add to score
+                score += (0.0625*bestMoveSearch(getPossibleMoves(getCurrentPlayer(), 0), 0, score, depth)) +
+                    (0.25 * bestMoveSearch(getPossibleMoves(getCurrentPlayer(), 1), 1, score, depth)) +
+                    (0.375 * bestMoveSearch(getPossibleMoves(getCurrentPlayer(), 2), 2, score, depth)) +
+                    (0.25 * bestMoveSearch(getPossibleMoves(getCurrentPlayer(), 3), 3, score, depth)) +
+                    (0.0625 * bestMoveSearch(getPossibleMoves(getCurrentPlayer(), 4), 4, score, depth));
+                undoMove();
+            }
+            return possibleMoves[Array.IndexOf(moveScores, moveScores.Max())];
+        }*/
+
 
         public void humanMove(int roll)
         {
@@ -286,11 +350,16 @@ namespace Ur
 
         static void Main(string[] args)
         {
-            Game game = new Game();
-            game.player1 = new Player(1);
-            game.player2 = new Player(2);
-            game.gameBoard = new GameBoard();
-            game.playGame();
+            int p1=0, p2=0;
+            for (int i = 0; i < 2000; i++) { 
+                Game game = new Game();
+                game.player1 = new Player(1);
+                game.player2 = new Player(2);
+                game.gameBoard = new GameBoard();
+                int winner = game.playGame();
+                if (winner == 1) { p1 += 1; } else if (winner == 2){ p2 += 1; }
+                Console.WriteLine("Player 1: " + p1 + " Player 2: " + p2);
+            }
         }
     }
 
