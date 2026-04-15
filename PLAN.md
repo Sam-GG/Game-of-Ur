@@ -20,11 +20,11 @@
 
 ## Phase 3: Python RL Training
 
-- [ ] Set up Python project with Stable-Baselines3 and sb3-contrib
-- [ ] Implement a Gym wrapper that communicates with the C# `GameEnvironment` over the IPC interface
-- [ ] Use `MaskablePPO` from sb3-contrib (invalid action masking is critical for board games)
-- [ ] Train agent vs random opponent first (~500K–1M steps, target >60% win rate)
-- [ ] Logging with TensorBoard: win rate, avg game length, reward per episode, action distribution
+- [x] Set up Python project with Stable-Baselines3 and sb3-contrib
+- [x] Implement a Gym wrapper that communicates with the C# `GameEnvironment` over the IPC interface
+- [x] Use `MaskablePPO` from sb3-contrib (invalid action masking is critical for board games)
+- [x] Train agent vs random opponent first (~500K–1M steps, target >60% win rate)
+- [x] Logging with TensorBoard: win rate, avg game length, reward per episode, action distribution
 
 ## Phase 4: Self-Play & Analysis
 
