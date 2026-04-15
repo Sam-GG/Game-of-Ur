@@ -88,7 +88,14 @@ namespace Ur
                 }
                 case "step":
                 {
-                    var (state, reward, done, info) = env.Step(request.Action);
+                    if (!request.Action.HasValue)
+                    {
+                        return new BridgeResponse
+                        {
+                            Info = new Dictionary<string, object> { { "error", "step requires an 'action' field" } }
+                        };
+                    }
+                    var (state, reward, done, info) = env.Step(request.Action.Value);
                     var validActions = env.GetValidActions();
                     return new BridgeResponse
                     {
@@ -138,7 +145,7 @@ namespace Ur
     class BridgeRequest
     {
         public string Method { get; set; }
-        public int Action { get; set; }
+        public int? Action { get; set; }
     }
 
     class BridgeResponse
