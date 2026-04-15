@@ -72,11 +72,54 @@ The engine uses three parallel stacks to snapshot and restore state:
 
 > **Note:** A bug in the original code (fixed in Phase 1) meant `undoMove()` was only called on a successful probe, leaving stale snapshots on the stack after failed probes. See `BUGS.md` Bug 1.
 
-## Class Structure (post-Phase 1 refactor)
+## Class Structure (post-Phase 2)
 
-| File          | Class      | Responsibility                                      |
-|---------------|------------|-----------------------------------------------------|
-| `Game.cs`     | `Game`     | Game loop, undo system, human/AI move selection     |
-| `Player.cs`   | `Player`   | Player state: piece counts, movement pattern, double turn |
-| `GamePiece.cs`| `GamePiece`| Piece state: owner, progress counter, in-hand flag  |
-| `GameBoard.cs`| `GameBoard`| Board array, move execution, collision detection    |
+| File                  | Class              | Responsibility                                                      |
+|-----------------------|--------------------|---------------------------------------------------------------------|
+| `Game.cs`             | `Game`             | Game loop, undo system, human/AI move selection                     |
+| `Player.cs`           | `Player`           | Player state: piece counts, movement pattern, double turn           |
+| `GamePiece.cs`        | `GamePiece`        | Piece state: owner, progress counter, in-hand flag                  |
+| `GameBoard.cs`        | `GameBoard`        | Board array, move execution, collision detection                    |
+| `GameEnvironment.cs`  | `GameEnvironment`  | Gym-style RL API: Reset, Step, GetValidActions, state vector        |
+| `EnvironmentBridge.cs`| `EnvironmentBridge` | Stdin/stdout JSON-line IPC for Python training                     |
+
+## GameEnvironment (Phase 2)
+
+### State Vector (30 floats, normalized [0, 1])
+
+| Index  | Meaning                                                |
+|--------|--------------------------------------------------------|
+| 0–6    | Player 1 piece progress: `(movementCounter + 1) / 15` |
+| 7–13   | Player 2 piece progress                               |
+| 14     | Player 1 pieces in hand / 7                           |
+| 15     | Player 1 pieces in goal / 7                           |
+| 16     | Player 2 pieces in hand / 7                           |
+| 17     | Player 2 pieces in goal / 7                           |
+| 18     | Current roll / 4                                      |
+| 19–26  | Action mask (1 = valid, 0 = invalid)                  |
+| 27     | Has double turn flag                                  |
+| 28–29  | Reserved                                              |
+
+### Action Space (8 discrete actions)
+
+| Action | Meaning                                    |
+|--------|--------------------------------------------|
+| 0–6    | Move piece at logical index N (sorted by progress) |
+| 7      | Place new piece from hand                  |
+
+### IPC Protocol (stdin/stdout JSON lines)
+
+Run with `dotnet run -- --bridge [--seed N]`. Each line is a JSON object:
+
+```json
+{"method": "reset"}
+{"method": "step", "action": 7}
+{"method": "get_valid_actions"}
+{"method": "get_state"}
+{"method": "close"}
+```
+
+Response format:
+```json
+{"state": [...], "reward": 0, "done": false, "valid_actions": [...], "info": {}}
+```

@@ -215,6 +215,12 @@ namespace Ur
 
         static void Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--bridge")
+            {
+                EnvironmentBridge.RunBridge(args);
+                return;
+            }
+
             Game game = new Game();
             game.player1 = new Player(1);
             game.player2 = new Player(2);
