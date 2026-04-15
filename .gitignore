@@ -364,6 +364,6 @@ FodyWeavers.xsd
 
 # Python RL training artifacts
 python/tb_logs/
-python/models/
+python/models/checkpoints
 python/.venv/
 *.egg-info/
