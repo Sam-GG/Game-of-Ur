@@ -12,11 +12,11 @@
 
 ## Phase 2: Training-Ready Game API
 
-- [ ] Build a `GameEnvironment` class with Gym-style interface: `Reset()`, `Step(action) → (state, reward, done, info)`, `GetValidActions()`
-- [ ] Design a proper fixed-size state vector (not string concatenation). Approximately 30 floats: 7 values for each piece's progress (0–14 or -1 for hand), 7 for opponent pieces, roll, pieces in hand/goal for both players. All normalized to [0, 1].
-- [ ] Design a fixed discrete action space with invalid-action masking. Actions map to "move piece N" where N is a logical piece index (0–6), plus "place new piece". Invalid actions are masked per turn.
-- [ ] Reward: start with only win/loss signal (+1/-1 at game end, 0 otherwise). Only add shaping if training fails to converge. The owner explicitly wants minimal shaping to let the agent explore freely.
-- [ ] Expose `GameEnvironment` over a clean IPC interface (gRPC or stdin/stdout protocol) so the Python training script can call `Reset`, `Step`, `GetValidActions` as RPCs.
+- [x] Build a `GameEnvironment` class with Gym-style interface: `Reset()`, `Step(action) → (state, reward, done, info)`, `GetValidActions()`
+- [x] Design a proper fixed-size state vector (not string concatenation). Approximately 30 floats: 7 values for each piece's progress (0–14 or -1 for hand), 7 for opponent pieces, roll, pieces in hand/goal for both players. All normalized to [0, 1].
+- [x] Design a fixed discrete action space with invalid-action masking. Actions map to "move piece N" where N is a logical piece index (0–6), plus "place new piece". Invalid actions are masked per turn.
+- [x] Reward: start with only win/loss signal (+1/-1 at game end, 0 otherwise). Only add shaping if training fails to converge. The owner explicitly wants minimal shaping to let the agent explore freely.
+- [x] Expose `GameEnvironment` over a clean IPC interface (gRPC or stdin/stdout protocol) so the Python training script can call `Reset`, `Step`, `GetValidActions` as RPCs.
 
 ## Phase 3: Python RL Training
 

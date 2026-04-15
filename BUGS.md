@@ -73,7 +73,7 @@ if (roll == 0)
 
 ## Bug 4: State Representation Is Ambiguous (RL Branch)
 
-**Status:** - [ ] To be addressed in Phase 2
+**Status:** - [x] Fixed in Phase 2
 
 **Description:** The state string sent to Python in the `ReinforcementLearning` branch is a raw concatenation: board as 20 digits + roll + p1Goal + p1Hand + p2Goal + p2Hand. There are no delimiters.
 
