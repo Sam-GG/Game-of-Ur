@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Python RL training artifacts
+python/tb_logs/
+python/models/
+python/.venv/
+*.egg-info/
