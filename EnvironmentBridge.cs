@@ -16,25 +16,34 @@ namespace Ur
     /// Request format:
     ///   { "method": "reset" }
     ///   { "method": "step", "action": 3 }
+    ///   { "method": "opponent_step", "action": 5 }   (external opponent mode only)
     ///   { "method": "get_valid_actions" }
     ///   { "method": "get_state" }
     ///   { "method": "close" }
     ///
     /// Response format:
     ///   { "state": [...], "reward": 0.0, "done": false, "info": {}, "valid_actions": [...] }
+    ///
+    /// CLI flags:
+    ///   --bridge              Enable IPC bridge mode
+    ///   --seed N              Random seed for reproducibility
+    ///   --opponent TYPE       Opponent strategy: random (default), greedy, defensive, external
     /// </summary>
     static class EnvironmentBridge
     {
         public static void RunBridge(string[] args)
         {
             int? seed = null;
+            string opponentType = "random";
             for (int i = 0; i < args.Length - 1; i++)
             {
                 if (args[i] == "--seed" && int.TryParse(args[i + 1], out int s))
                     seed = s;
+                if (args[i] == "--opponent")
+                    opponentType = args[i + 1];
             }
 
-            var env = new GameEnvironment(seed);
+            var env = new GameEnvironment(seed, opponentType);
             var options = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -96,6 +105,26 @@ namespace Ur
                         };
                     }
                     var (state, reward, done, info) = env.Step(request.Action.Value);
+                    var validActions = env.GetValidActions();
+                    return new BridgeResponse
+                    {
+                        State = state,
+                        Reward = reward,
+                        Done = done,
+                        ValidActions = validActions,
+                        Info = info
+                    };
+                }
+                case "opponent_step":
+                {
+                    if (!request.Action.HasValue)
+                    {
+                        return new BridgeResponse
+                        {
+                            Info = new Dictionary<string, object> { { "error", "opponent_step requires an 'action' field" } }
+                        };
+                    }
+                    var (state, reward, done, info) = env.OpponentStep(request.Action.Value);
                     var validActions = env.GetValidActions();
                     return new BridgeResponse
                     {

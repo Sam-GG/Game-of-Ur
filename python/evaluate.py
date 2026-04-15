@@ -5,6 +5,8 @@ Evaluate a trained MaskablePPO agent on the Royal Game of Ur.
 Usage:
     python evaluate.py --model ./models/ur_ppo_final.zip
     python evaluate.py --model ./models/ur_ppo_final.zip --episodes 500 --seed 0
+    python evaluate.py --model ./models/ur_ppo_final.zip --opponent greedy
+    python evaluate.py --model ./models/ur_ppo_final.zip --opponent defensive --deterministic
 
 Reports win rate, loss rate, average game length, and average reward
 over the requested number of evaluation episodes.
@@ -54,6 +56,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=False,
         help="Use deterministic actions (greedy policy)",
+    )
+    p.add_argument(
+        "--opponent",
+        type=str,
+        default="random",
+        choices=["random", "greedy", "defensive"],
+        help="Opponent strategy: random (default), greedy, or defensive",
     )
     return p.parse_args()
 
@@ -128,10 +137,11 @@ def main():
     print(f"  Model           : {args.model}")
     print(f"  Episodes        : {args.episodes}")
     print(f"  Deterministic   : {args.deterministic}")
+    print(f"  Opponent        : {args.opponent}")
     print(f"  C# project dir  : {args.csproj_dir}")
     print()
 
-    env = UrEnv(csproj_dir=args.csproj_dir, seed=args.seed)
+    env = UrEnv(csproj_dir=args.csproj_dir, seed=args.seed, opponent=args.opponent)
     model = MaskablePPO.load(args.model)
 
     results = evaluate(

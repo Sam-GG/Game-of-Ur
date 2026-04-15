@@ -6,7 +6,8 @@ namespace Ur
 {
     /// <summary>
     /// Gym-style environment wrapper for the Game of Ur.
-    /// The agent always controls Player 1. Player 2 acts as a random opponent.
+    /// The agent always controls Player 1. Player 2 acts as an opponent
+    /// whose strategy is determined by <see cref="OpponentType"/>.
     /// 
     /// Action space: discrete, 8 actions.
     ///   Actions 0–6: move the piece with logical index N (sorted by movementCounter ascending).
@@ -34,6 +35,9 @@ namespace Ur
         private const float MaxProgress = 14f;
         private const float MaxRoll = 4f;
 
+        /// <summary>Opponent strategy for Player 2.</summary>
+        public string OpponentType { get; }
+
         private InternalGame _game;
         private int _currentRoll;
         private bool _done;
@@ -43,14 +47,22 @@ namespace Ur
         // Rebuilt each turn so the agent sees a consistent ordering.
         private int[] _p1PieceMap;
 
+        // For the "external" opponent mode: when true, Step() has paused
+        // waiting for the caller to supply the opponent's action via OpponentStep().
+        private bool _waitingForOpponent;
+        private int _opponentRoll;
+
         // Always access board/player state through the Game to stay in sync
         // after getPossibleMoves replaces references via undoMove().
         private GameBoard Board => _game.CurrentBoard;
         private Player Player1 => _game.CurrentPlayer1;
         private Player Player2 => _game.CurrentPlayer2;
 
-        public GameEnvironment(int? seed = null)
+        /// <param name="seed">Optional RNG seed for reproducibility.</param>
+        /// <param name="opponentType">One of: random, greedy, defensive, external.</param>
+        public GameEnvironment(int? seed = null, string opponentType = "random")
         {
+            OpponentType = (opponentType ?? "random").ToLowerInvariant();
             _rng = seed.HasValue ? new Random(seed.Value) : new Random();
             _game = new InternalGame();
             _p1PieceMap = new int[PieceCount];
@@ -65,10 +77,13 @@ namespace Ur
         {
             _game.Init(new Player(1), new Player(2), new GameBoard());
             _done = false;
+            _waitingForOpponent = false;
             _currentRoll = RollDice();
 
             // If roll is 0, agent has no moves — skip to opponent until agent gets a non-empty turn
-            SkipIfNoMoves();
+            // For "external" opponent mode, skipping requires the caller to drive opponent turns.
+            if (OpponentType != "external")
+                SkipIfNoMoves();
 
             return GetState();
         }
@@ -95,8 +110,30 @@ namespace Ur
         }
 
         /// <summary>
+        /// Returns valid actions for the opponent (Player 2) as board indices.
+        /// Used by the "external" opponent mode.
+        /// </summary>
+        public List<int> GetOpponentValidMoves()
+        {
+            return _game.getPossibleMoves(Player2, _opponentRoll);
+        }
+
+        /// <summary>
+        /// Returns the current dice roll for the opponent. Only meaningful
+        /// when <see cref="IsWaitingForOpponent"/> is true.
+        /// </summary>
+        public int GetOpponentRoll() => _opponentRoll;
+
+        /// <summary>True when the environment is paused waiting for an external opponent action.</summary>
+        public bool IsWaitingForOpponent => _waitingForOpponent;
+
+        /// <summary>
         /// Executes the given action for the agent (Player 1).
         /// Returns (state, reward, done, info).
+        ///
+        /// For the "external" opponent mode, after the agent moves, if it's the
+        /// opponent's turn the response includes "opponent_turn" = true in info.
+        /// The caller must then supply the opponent's action via <see cref="OpponentStep"/>.
         /// </summary>
         public (float[] state, float reward, bool done, Dictionary<string, object> info) Step(int action)
         {
@@ -134,11 +171,30 @@ namespace Ur
             {
                 Player1.hasDouble = false;
                 _currentRoll = RollDice();
-                SkipIfNoMoves();
+                if (OpponentType != "external")
+                    SkipIfNoMoves();
                 return (GetState(), 0f, _done, info);
             }
 
             // Opponent's turn(s)
+            if (OpponentType == "external")
+            {
+                // Roll for opponent and pause — caller must supply action via OpponentStep()
+                _opponentRoll = RollDice();
+                var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
+                if (opponentMoves.Count == 0)
+                {
+                    // No moves for opponent — roll for agent's next turn
+                    _currentRoll = RollDice();
+                    return (GetState(), 0f, false, info);
+                }
+                _waitingForOpponent = true;
+                info["opponent_turn"] = true;
+                info["opponent_roll"] = _opponentRoll;
+                info["opponent_valid_moves"] = opponentMoves;
+                return (GetState(), 0f, false, info);
+            }
+
             PlayOpponentTurns();
 
             // Check if opponent won
@@ -154,6 +210,60 @@ namespace Ur
             SkipIfNoMoves();
 
             return (GetState(), 0f, _done, info);
+        }
+
+        /// <summary>
+        /// Executes an opponent (Player 2) action in "external" opponent mode.
+        /// The action is a board index (from <see cref="GetOpponentValidMoves"/>)
+        /// or -1 for placing from hand.
+        ///
+        /// After executing, if the opponent gets a double turn, the response
+        /// includes "opponent_turn" = true again; otherwise it rolls for the
+        /// agent's next turn and returns the agent's state.
+        /// </summary>
+        public (float[] state, float reward, bool done, Dictionary<string, object> info) OpponentStep(int boardIdx)
+        {
+            var info = new Dictionary<string, object>();
+
+            if (!_waitingForOpponent)
+            {
+                info["error"] = "Not waiting for opponent action.";
+                return (GetState(), 0f, _done, info);
+            }
+
+            _waitingForOpponent = false;
+            ExecuteMove(Player2, Player1, boardIdx, _opponentRoll);
+
+            // Check if opponent won
+            if (Player2.piecesInGoal >= 7)
+            {
+                _done = true;
+                info["winner"] = 2;
+                return (GetState(), -1f, true, info);
+            }
+
+            // If opponent got a double, keep going
+            if (Player2.hasDouble)
+            {
+                Player2.hasDouble = false;
+                _opponentRoll = RollDice();
+                var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
+                if (opponentMoves.Count == 0)
+                {
+                    // No moves — skip, roll for agent
+                    _currentRoll = RollDice();
+                    return (GetState(), 0f, false, info);
+                }
+                _waitingForOpponent = true;
+                info["opponent_turn"] = true;
+                info["opponent_roll"] = _opponentRoll;
+                info["opponent_valid_moves"] = opponentMoves;
+                return (GetState(), 0f, false, info);
+            }
+
+            // Opponent done — roll for agent's next turn
+            _currentRoll = RollDice();
+            return (GetState(), 0f, false, info);
         }
 
         /// <summary>
@@ -320,8 +430,8 @@ namespace Ur
         }
 
         /// <summary>
-        /// Plays the random opponent (Player 2) until it's the agent's turn again.
-        /// Handles double turns for the opponent.
+        /// Plays the opponent (Player 2) until it's the agent's turn again.
+        /// Handles double turns. Uses the opponent strategy set by <see cref="OpponentType"/>.
         /// </summary>
         private void PlayOpponentTurns()
         {
@@ -332,7 +442,7 @@ namespace Ur
 
                 if (opponentMoves.Count > 0)
                 {
-                    int move = opponentMoves[_rng.Next(opponentMoves.Count)];
+                    int move = PickOpponentMove(opponentMoves, opponentRoll);
                     ExecuteMove(Player2, Player1, move, opponentRoll);
                 }
 
@@ -350,6 +460,160 @@ namespace Ur
                 // Opponent's turn is over
                 break;
             }
+        }
+
+        /// <summary>
+        /// Selects an opponent move based on the current <see cref="OpponentType"/>.
+        /// </summary>
+        private int PickOpponentMove(List<int> possibleMoves, int roll)
+        {
+            return OpponentType switch
+            {
+                "greedy" => PickGreedyMove(possibleMoves, roll),
+                "defensive" => PickDefensiveMove(possibleMoves, roll),
+                _ => possibleMoves[_rng.Next(possibleMoves.Count)], // random
+            };
+        }
+
+        /// <summary>
+        /// Greedy heuristic: prioritize scoring → capturing → landing on rosette → advancing furthest piece.
+        /// </summary>
+        private int PickGreedyMove(List<int> possibleMoves, int roll)
+        {
+            int bestMove = possibleMoves[0];
+            int bestScore = int.MinValue;
+
+            foreach (int boardIdx in possibleMoves)
+            {
+                int score = 0;
+                int currentProgress;
+
+                if (boardIdx == -1)
+                {
+                    // Place from hand: movementCounter = -1, new counter = -1 + roll = roll - 1
+                    currentProgress = -1;
+                }
+                else
+                {
+                    var piece = Board.getPiece(boardIdx);
+                    currentProgress = piece.movementCounter;
+                }
+
+                int newProgress = currentProgress + roll;
+                int destinationBoardIdx = newProgress < 14 ? Player2.movementPattern[newProgress] : -1;
+
+                // Scoring a piece is highest priority
+                if (newProgress == 14)
+                {
+                    score = 10000;
+                }
+                // Capturing an opponent piece
+                else if (destinationBoardIdx >= 0 && Board.gameBoard[destinationBoardIdx] != null
+                         && Board.gameBoard[destinationBoardIdx].player.playerNum == Player1.playerNum)
+                {
+                    score = 5000;
+                }
+                // Landing on a rosette (double turn)
+                else if (destinationBoardIdx >= 0 && IsRosette(destinationBoardIdx))
+                {
+                    score = 3000;
+                }
+
+                // Tiebreaker: prefer advancing the piece that's furthest along
+                score += currentProgress + roll;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestMove = boardIdx;
+                }
+            }
+
+            return bestMove;
+        }
+
+        /// <summary>
+        /// Defensive heuristic: prioritize scoring → rosette safety → escaping shared lane → placing new pieces.
+        /// </summary>
+        private int PickDefensiveMove(List<int> possibleMoves, int roll)
+        {
+            int bestMove = possibleMoves[0];
+            int bestScore = int.MinValue;
+
+            // Shared lane board indices where captures can happen (6–13, excluding safe rosette 9)
+            var dangerZone = new HashSet<int> { 6, 7, 8, 10, 11, 12, 13 };
+
+            foreach (int boardIdx in possibleMoves)
+            {
+                int score = 0;
+                int currentProgress;
+
+                if (boardIdx == -1)
+                {
+                    currentProgress = -1;
+                }
+                else
+                {
+                    var piece = Board.getPiece(boardIdx);
+                    currentProgress = piece.movementCounter;
+                }
+
+                int newProgress = currentProgress + roll;
+                int destinationBoardIdx = newProgress < 14 ? Player2.movementPattern[newProgress] : -1;
+
+                // Scoring a piece is highest priority
+                if (newProgress == 14)
+                {
+                    score = 10000;
+                }
+                // Landing on a rosette (safe + double turn)
+                else if (destinationBoardIdx >= 0 && IsRosette(destinationBoardIdx))
+                {
+                    score = 8000;
+                }
+                // Moving a piece OUT of the danger zone to safety
+                else if (boardIdx >= 0 && dangerZone.Contains(boardIdx)
+                         && destinationBoardIdx >= 0 && !dangerZone.Contains(destinationBoardIdx))
+                {
+                    score = 6000;
+                }
+                // Capturing an opponent (still good, but not the primary goal)
+                else if (destinationBoardIdx >= 0 && Board.gameBoard[destinationBoardIdx] != null
+                         && Board.gameBoard[destinationBoardIdx].player.playerNum == Player1.playerNum)
+                {
+                    score = 4000;
+                }
+                // Placing new piece from hand
+                else if (boardIdx == -1)
+                {
+                    score = 2000;
+                }
+                // Avoid moving INTO the danger zone
+                else if (destinationBoardIdx >= 0 && dangerZone.Contains(destinationBoardIdx))
+                {
+                    score = 500;
+                }
+                else
+                {
+                    score = 1000;
+                }
+
+                // Tiebreaker: prefer piece nearest to goal
+                score += newProgress;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestMove = boardIdx;
+                }
+            }
+
+            return bestMove;
+        }
+
+        private static bool IsRosette(int boardIdx)
+        {
+            return boardIdx == 3 || boardIdx == 4 || boardIdx == 9 || boardIdx == 17 || boardIdx == 18;
         }
 
         /// <summary>
