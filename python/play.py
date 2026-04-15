@@ -38,6 +38,7 @@ BOARD_TEMPLATE = r"""
 """
 
 ROSETTES = {3, 4, 9, 17, 18}
+TOTAL_PIECES = 7
 
 
 def format_board(state_vec: np.ndarray) -> str:
@@ -61,10 +62,10 @@ def format_board(state_vec: np.ndarray) -> str:
 
 def display_game_state(state_vec: np.ndarray):
     """Display the current game state to the terminal."""
-    p1_hand = state_vec[14] * 7
-    p1_goal = state_vec[15] * 7
-    p2_hand = state_vec[16] * 7
-    p2_goal = state_vec[17] * 7
+    p1_hand = state_vec[14] * TOTAL_PIECES
+    p1_goal = state_vec[15] * TOTAL_PIECES
+    p2_hand = state_vec[16] * TOTAL_PIECES
+    p2_goal = state_vec[17] * TOTAL_PIECES
     roll = state_vec[18] * 4
 
     print(format_board(state_vec))

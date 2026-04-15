@@ -32,18 +32,14 @@ from callbacks import UrMetricsCallback
 from ur_env import UrEnv
 
 
-def make_opponent_callback(model: MaskablePPO, env_ref: list):
+def make_opponent_callback(model: MaskablePPO, obs_holder: list):
     """Create a callback that uses a frozen model to pick opponent moves.
 
     The callback receives the bridge info dict (with ``opponent_valid_moves``
     and ``opponent_roll``) and returns a board-index action.
 
-    Since the model was trained as Player 1 (the agent), we can't directly
-    reuse its action-space mapping for Player 2. Instead, we use the model's
-    policy to score moves heuristically: for each valid board-index move,
-    we estimate a preference from the model's value function and pick the
-    best one. As a practical approximation, we select randomly among valid
-    moves weighted by the model's action probabilities where applicable.
+    ``obs_holder`` is a mutable single-element list that the training loop
+    updates with the latest observation so the callback can use it.
     """
 
     def callback(info: dict) -> int:
@@ -53,8 +49,11 @@ def make_opponent_callback(model: MaskablePPO, env_ref: list):
         if len(valid_moves) == 1:
             return valid_moves[0]
 
-        env = env_ref[0]
-        if env is None or model is None:
+        if model is None:
+            return pyrandom.choice(valid_moves)
+
+        obs_arr = obs_holder[0] if obs_holder[0] is not None else None
+        if obs_arr is None:
             return pyrandom.choice(valid_moves)
 
         # Use the model's policy on the current observation to get action probs.
@@ -62,14 +61,6 @@ def make_opponent_callback(model: MaskablePPO, env_ref: list):
         # preferences (e.g., prefer scoring, captures, rosettes) still provide
         # useful signal for selecting among the opponent's valid moves.
         try:
-            obs = env.unwrapped._last_obs if hasattr(env.unwrapped, '_last_obs') else None
-            if obs is None:
-                # Fall back: get current state from the env's bridge
-                obs_arr, _ = np.zeros(30, dtype=np.float32), None
-            else:
-                obs_arr = obs
-
-            # Get action distribution from the model
             import torch
             obs_tensor = torch.as_tensor(obs_arr).float().unsqueeze(0)
             with torch.no_grad():
@@ -79,8 +70,6 @@ def make_opponent_callback(model: MaskablePPO, env_ref: list):
             # Map model action preferences to valid board-index moves.
             # Action 7 = place from hand (-1 board index).
             # Actions 0-6 = move piece by logical index.
-            # Use a simple heuristic: weight valid moves by how much the
-            # model's policy prefers similar actions.
             move_weights = []
             for move in valid_moves:
                 if move == -1:
@@ -106,18 +95,23 @@ def make_self_play_env(
     csproj_dir: str,
     opponent_model: MaskablePPO | None,
     seed: int | None = None,
+    obs_holder: list | None = None,
 ) -> ActionMasker:
-    """Create an env where the opponent is a frozen model (or random if None)."""
+    """Create an env where the opponent is a frozen model (or random if None).
+
+    ``obs_holder`` is a mutable single-element list that the training loop
+    updates with the latest observation, used by the opponent callback.
+    """
     if opponent_model is not None:
-        env_ref: list = [None]
-        callback = make_opponent_callback(opponent_model, env_ref)
+        if obs_holder is None:
+            obs_holder = [None]
+        callback = make_opponent_callback(opponent_model, obs_holder)
         env = UrEnv(
             csproj_dir=csproj_dir,
             seed=seed,
             opponent="external",
             opponent_callback=callback,
         )
-        env_ref[0] = env
     else:
         env = UrEnv(csproj_dir=csproj_dir, seed=seed)
 
@@ -295,7 +289,7 @@ def main():
         # Use random win rate as the primary metric for promotion
         if win_rate_random > best_win_rate:
             best_win_rate = win_rate_random
-            best_model = MaskablePPO.load(iter_path)
+            best_model = model
             best_path = str(save_dir / "self_play_best")
             model.save(best_path)
             print(f"  ★ New best model! Saved to {best_path}")

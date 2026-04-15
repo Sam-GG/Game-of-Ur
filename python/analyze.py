@@ -291,7 +291,7 @@ def save_plots(results: list[dict], phase_actions: dict, output_dir: Path):
     print(f"  Saved: {output_dir / 'action_phases.png'}")
 
     # 3. Per-opponent action distribution
-    if len(results) > 1:
+    if len(results) >= 1:
         fig, axes = plt.subplots(1, len(results), figsize=(5 * len(results), 5), sharey=True)
         if len(results) == 1:
             axes = [axes]
