@@ -173,26 +173,15 @@ namespace Ur
                 _currentRoll = RollDice();
                 if (OpponentType != "external")
                     SkipIfNoMoves();
+                else
+                    return ExternalSkipIfNoMoves(info);
                 return (GetState(), 0f, _done, info);
             }
 
             // Opponent's turn(s)
             if (OpponentType == "external")
             {
-                // Roll for opponent and pause — caller must supply action via OpponentStep()
-                _opponentRoll = RollDice();
-                var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
-                if (opponentMoves.Count == 0)
-                {
-                    // No moves for opponent — roll for agent's next turn
-                    _currentRoll = RollDice();
-                    return (GetState(), 0f, false, info);
-                }
-                _waitingForOpponent = true;
-                info["opponent_turn"] = true;
-                info["opponent_roll"] = _opponentRoll;
-                info["opponent_valid_moves"] = opponentMoves;
-                return (GetState(), 0f, false, info);
+                return StartExternalOpponentTurn(info);
             }
 
             PlayOpponentTurns();
@@ -246,24 +235,12 @@ namespace Ur
             if (Player2.hasDouble)
             {
                 Player2.hasDouble = false;
-                _opponentRoll = RollDice();
-                var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
-                if (opponentMoves.Count == 0)
-                {
-                    // No moves — skip, roll for agent
-                    _currentRoll = RollDice();
-                    return (GetState(), 0f, false, info);
-                }
-                _waitingForOpponent = true;
-                info["opponent_turn"] = true;
-                info["opponent_roll"] = _opponentRoll;
-                info["opponent_valid_moves"] = opponentMoves;
-                return (GetState(), 0f, false, info);
+                return StartExternalOpponentTurn(info);
             }
 
             // Opponent done — roll for agent's next turn
             _currentRoll = RollDice();
-            return (GetState(), 0f, false, info);
+            return ExternalSkipIfNoMoves(info);
         }
 
         /// <summary>
@@ -614,6 +591,65 @@ namespace Ur
         private static bool IsRosette(int boardIdx)
         {
             return boardIdx == 3 || boardIdx == 4 || boardIdx == 9 || boardIdx == 17 || boardIdx == 18;
+        }
+
+        /// <summary>
+        /// Start an opponent turn in external mode.  Rolls for the opponent; if
+        /// the opponent has no moves, skips straight to the agent's next turn
+        /// (which itself may also need to skip — see <see cref="ExternalSkipIfNoMoves"/>).
+        /// </summary>
+        private (float[] state, float reward, bool done, Dictionary<string, object> info) StartExternalOpponentTurn(
+            Dictionary<string, object> info)
+        {
+            _opponentRoll = RollDice();
+            var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
+            if (opponentMoves.Count == 0)
+            {
+                // No moves for opponent — roll for agent's next turn
+                _currentRoll = RollDice();
+                return ExternalSkipIfNoMoves(info);
+            }
+            _waitingForOpponent = true;
+            info["opponent_turn"] = true;
+            info["opponent_roll"] = _opponentRoll;
+            info["opponent_valid_moves"] = opponentMoves;
+            return (GetState(), 0f, false, info);
+        }
+
+        /// <summary>
+        /// In external mode, if the agent has no valid moves after a roll,
+        /// loop: give opponent a turn (returning opponent_turn), then check again.
+        /// If the opponent also has no moves, keep alternating until someone does
+        /// or the game ends.
+        /// </summary>
+        private (float[] state, float reward, bool done, Dictionary<string, object> info) ExternalSkipIfNoMoves(
+            Dictionary<string, object> info)
+        {
+            // Loop while agent has no moves
+            while (!_done)
+            {
+                var agentMoves = _game.getPossibleMoves(Player1, _currentRoll);
+                if (agentMoves.Count > 0)
+                    return (GetState(), 0f, false, info);
+
+                // Agent has no moves — give opponent a turn
+                _opponentRoll = RollDice();
+                var opponentMoves = _game.getPossibleMoves(Player2, _opponentRoll);
+                if (opponentMoves.Count > 0)
+                {
+                    // Opponent has moves — delegate to caller
+                    _waitingForOpponent = true;
+                    info["opponent_turn"] = true;
+                    info["opponent_roll"] = _opponentRoll;
+                    info["opponent_valid_moves"] = opponentMoves;
+                    return (GetState(), 0f, false, info);
+                }
+
+                // Neither side can move — roll again for agent
+                _currentRoll = RollDice();
+            }
+
+            return (GetState(), 0f, _done, info);
         }
 
         /// <summary>

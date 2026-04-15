@@ -123,8 +123,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--deterministic",
         action="store_true",
-        default=True,
-        help="Use deterministic (greedy) policy for the AI (default: True)",
+        default=False,
+        help="Use deterministic (greedy) policy for the AI (default: stochastic)",
     )
     return p.parse_args()
 
@@ -176,7 +176,7 @@ def main():
                 )
                 action = int(action)
 
-                action_name = f"move piece {action}" if action < 7 else "place new piece"
+                action_name = f"move piece (index {action})" if action < 7 else "place new piece"
                 print(f"  AI plays: action {action} ({action_name})")
 
                 obs, reward, done, truncated, info = env.step(action)
