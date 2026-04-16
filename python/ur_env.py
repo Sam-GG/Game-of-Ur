@@ -35,6 +35,16 @@ P2_PATTERN = [14, 15, 16, 17, 6, 7, 8, 9, 10, 11, 12, 13, 19, 18]
 def state_to_board(state_vec) -> list[int]:
     """Reconstruct the 20-cell board array from the 30-element state vector.
 
+    The state vector encodes each piece's progress as
+    ``(movementCounter + 1) / 15``:
+
+    * ``state_vec[0..6]``  — Player 1's 7 pieces (0.0 = in hand, 1.0 = scored)
+    * ``state_vec[7..13]`` — Player 2's 7 pieces
+
+    We reverse the encoding to ``movementCounter = round(val * 15) - 1``
+    and map on-board counters (0–13) to board positions via the
+    movement-pattern arrays.
+
     Returns a list of 20 ints: 0 = empty, 1 = Player 1, 2 = Player 2.
     """
     board = [0] * 20

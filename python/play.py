@@ -90,19 +90,28 @@ def display(board: list[int], state_vec: np.ndarray, *, show_roll: bool = True):
     print()
 
 
+def _move_destination(pattern: list[int], current_mc: int, roll: int) -> str:
+    """Describe the destination of a move along *pattern* from *current_mc*.
+
+    Returns a suffix like ``" → square 8"`` or ``" → GOAL!"``.
+    """
+    new_mc = current_mc + roll
+    if new_mc == 14:
+        return " → GOAL!"
+    if 0 <= new_mc <= 13:
+        to_pos = pattern[new_mc]
+        ros = " * rosette!" if to_pos in ROSETTES else ""
+        return f" → square {to_pos}{ros}"
+    return ""
+
+
 def describe_ai_action(
     action: int, roll: int, board: list[int], state_vec: np.ndarray
 ) -> str:
     """Return a human-readable description of the AI's chosen action."""
     if action == 7:
-        dest_mc = -1 + roll
-        if 0 <= dest_mc <= 13:
-            dest_pos = P1_PATTERN[dest_mc]
-            ros = " * rosette!" if dest_pos in ROSETTES else ""
-            return f"Place new piece → square {dest_pos}{ros}"
-        elif dest_mc == 14:
-            return "Place new piece → GOAL!"
-        return "Place new piece"
+        dest = _move_destination(P1_PATTERN, -1, roll)
+        return f"Place new piece{dest}"
 
     # action 0–6: move an existing piece.  Reconstruct the piece map the
     # same way C# does: collect (movementCounter, boardIdx) for ALL P1
@@ -136,14 +145,8 @@ def describe_ai_action(
         if from_pos < 0:
             # Shouldn't happen for actions 0–6 (those should be on-board)
             return f"Move piece (action {action})"
-        new_mc = mc_val + roll
-        if new_mc == 14:
-            return f"Move piece at square {from_pos} → GOAL!"
-        elif 0 <= new_mc <= 13:
-            to_pos = P1_PATTERN[new_mc]
-            ros = " * rosette!" if to_pos in ROSETTES else ""
-            return f"Move piece at square {from_pos} → square {to_pos}{ros}"
-        return f"Move piece at square {from_pos}"
+        dest = _move_destination(P1_PATTERN, mc_val, roll)
+        return f"Move piece at square {from_pos}{dest}"
     return f"Move piece (action {action})"
 
 
@@ -175,27 +178,16 @@ def human_opponent_callback(info: dict) -> int:
     print("  Valid moves:")
     for i, move in enumerate(valid_moves):
         if move == -1:
-            dest_mc = -1 + roll
-            if 0 <= dest_mc <= 13:
-                dest_pos = P2_PATTERN[dest_mc]
-                ros = " * rosette!" if dest_pos in ROSETTES else ""
-                print(f"    [{i}] Place new piece → square {dest_pos}{ros}")
-            else:
-                print(f"    [{i}] Place new piece")
+            dest = _move_destination(P2_PATTERN, -1, roll)
+            print(f"    [{i}] Place new piece{dest}")
         else:
             # Find movement counter from the board position
-            dest_desc = ""
+            dest = ""
             for mc_val, pos in enumerate(P2_PATTERN):
                 if pos == move:
-                    new_mc = mc_val + roll
-                    if new_mc == 14:
-                        dest_desc = " → GOAL!"
-                    elif 0 <= new_mc <= 13:
-                        to_pos = P2_PATTERN[new_mc]
-                        ros = " * rosette!" if to_pos in ROSETTES else ""
-                        dest_desc = f" → square {to_pos}{ros}"
+                    dest = _move_destination(P2_PATTERN, mc_val, roll)
                     break
-            print(f"    [{i}] Move piece at square {move}{dest_desc}")
+            print(f"    [{i}] Move piece at square {move}{dest}")
 
     while True:
         try:
