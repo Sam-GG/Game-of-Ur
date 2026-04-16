@@ -172,6 +172,14 @@ def main():
 
                 # AI's turn
                 action_masks = get_action_masks(env)
+
+                # Safety: if no valid actions (shouldn't happen, but handle gracefully)
+                if not np.any(action_masks):
+                    print("  (AI has no valid moves — skipping turn)")
+                    # Re-reset the environment to recover
+                    obs, _ = env.reset()
+                    continue
+
                 action, _ = model.predict(
                     obs, deterministic=args.deterministic, action_masks=action_masks
                 )

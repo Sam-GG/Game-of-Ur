@@ -80,10 +80,19 @@ namespace Ur
             _waitingForOpponent = false;
             _currentRoll = RollDice();
 
-            // If roll is 0, agent has no moves — skip to opponent until agent gets a non-empty turn
-            // For "external" opponent mode, skipping requires the caller to drive opponent turns.
-            if (OpponentType != "external")
+            // If roll is 0, agent has no moves — skip to opponent until agent gets a non-empty turn.
+            // For "external" opponent mode, we re-roll until non-zero because at game start
+            // (all pieces in hand) neither player can move with roll 0, so no opponent
+            // interaction is needed — it's equivalent to both sides skipping.
+            if (OpponentType == "external")
+            {
+                while (_currentRoll == 0 || _game.getPossibleMoves(Player1, _currentRoll).Count == 0)
+                    _currentRoll = RollDice();
+            }
+            else
+            {
                 SkipIfNoMoves();
+            }
 
             return GetState();
         }
