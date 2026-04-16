@@ -27,6 +27,30 @@ _DEFAULT_CSPROJ_DIR = str(Path(__file__).resolve().parent.parent)
 STATE_SIZE = 30
 ACTION_COUNT = 8
 
+# Movement patterns (must match Player.cs)
+P1_PATTERN = [0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 5, 4]
+P2_PATTERN = [14, 15, 16, 17, 6, 7, 8, 9, 10, 11, 12, 13, 19, 18]
+
+
+def state_to_board(state_vec) -> list[int]:
+    """Reconstruct the 20-cell board array from the 30-element state vector.
+
+    Returns a list of 20 ints: 0 = empty, 1 = Player 1, 2 = Player 2.
+    """
+    board = [0] * 20
+    for i in range(7):
+        # Player 1 pieces: state[0..6]
+        mc = round(state_vec[i] * 15) - 1
+        if 0 <= mc <= 13:
+            board[P1_PATTERN[mc]] = 1
+
+        # Player 2 pieces: state[7..13]
+        mc = round(state_vec[7 + i] * 15) - 1
+        if 0 <= mc <= 13:
+            board[P2_PATTERN[mc]] = 2
+
+    return board
+
 
 class UrEnv(gym.Env):
     """Gymnasium environment for the Royal Game of Ur.
@@ -93,6 +117,10 @@ class UrEnv(gym.Env):
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         response = self._send({"method": "step", "action": int(action)})
 
+        # Save display-relevant info before opponent handling may replace
+        # the response (opponent_step returns a fresh info dict).
+        initial_info = dict(response.get("info", {}))
+
         # Handle external opponent turns transparently
         response = self._handle_opponent_turns(response)
 
@@ -101,6 +129,13 @@ class UrEnv(gym.Env):
         done = bool(response["done"])
         self._update_mask(response)
         info = response.get("info", {})
+
+        # Preserve display-relevant fields from the initial step response
+        # that may have been lost when _handle_opponent_turns replaced it.
+        for key in ("agent_extra_turn", "opponent_skipped_roll"):
+            if key in initial_info and key not in info:
+                info[key] = initial_info[key]
+
         return obs, reward, done, False, info
 
     def action_masks(self) -> np.ndarray:
@@ -123,7 +158,15 @@ class UrEnv(gym.Env):
                 raise RuntimeError(
                     "opponent='external' requires an opponent_callback"
                 )
-            opp_action = self._opponent_callback(response.get("info", {}))
+
+            # Enrich callback info with the reconstructed board so that
+            # interactive callers (e.g. play.py) can display it.
+            cb_info = dict(response.get("info", {}))
+            state_arr = np.array(response["state"], dtype=np.float32)
+            cb_info["board"] = state_to_board(state_arr)
+            cb_info["state"] = state_arr
+
+            opp_action = self._opponent_callback(cb_info)
             response = self._send(
                 {"method": "opponent_step", "action": int(opp_action)}
             )

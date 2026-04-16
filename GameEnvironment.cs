@@ -179,6 +179,7 @@ namespace Ur
             if (Player1.hasDouble)
             {
                 Player1.hasDouble = false;
+                info["agent_extra_turn"] = "rosette";
                 _currentRoll = RollDice();
                 if (OpponentType != "external")
                     SkipIfNoMoves();
@@ -615,6 +616,7 @@ namespace Ur
             if (opponentMoves.Count == 0)
             {
                 // No moves for opponent — roll for agent's next turn
+                info["opponent_skipped_roll"] = _opponentRoll;
                 _currentRoll = RollDice();
                 return ExternalSkipIfNoMoves(info);
             }
