@@ -40,7 +40,7 @@ namespace Ur
             }
             else
             {
-                Console.WriteLine("There are no moves to undo.");
+                Console.Error.WriteLine("There are no moves to undo.");
             }
         }
 
@@ -68,7 +68,8 @@ namespace Ur
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.ToString());
+                    Console.Error.WriteLine(e.ToString());
+                    undoMove(); // Ensure state is restored even on exception
                 }
             }
             // check if the player can place a piece

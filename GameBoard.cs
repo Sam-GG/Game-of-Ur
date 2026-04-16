@@ -59,7 +59,7 @@ namespace Ur
         public GamePiece getPiece(int idx)
         {
             if (gameBoard[idx] == null) {
-                Console.WriteLine("Error, no piece at index " + idx + "");
+                Console.Error.WriteLine("Error, no piece at index " + idx + "");
             }
             return gameBoard[idx];
         }

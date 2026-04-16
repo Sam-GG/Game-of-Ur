@@ -28,7 +28,7 @@
 
 ## Phase 4: Self-Play & Analysis
 
-- [ ] Once agent beats random, implement self-play training
-- [ ] Freeze trained policy and evaluate against various opponents (random, greedy, defensive heuristic)
-- [ ] Visualize policy decisions for key board states to extract learned strategies
-- [ ] Compare findings to known Ur strategy research
+- [x] Once agent beats random, implement self-play training
+- [x] Freeze trained policy and evaluate against various opponents (random, greedy, defensive heuristic)
+- [x] Visualize policy decisions for key board states to extract learned strategies
+- [x] Compare findings to known Ur strategy research
