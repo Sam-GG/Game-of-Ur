@@ -24,15 +24,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from ur_env import UrEnv
 
-# Board layout for display
+# Board layout for display — keys are named strings (s0..s19) so that
+# str.format(**cells) works correctly (plain numeric indices like {14}
+# are treated as *positional* args by Python, causing IndexError).
 BOARD_TEMPLATE = r"""
     Player 2 lane        Player 2 exit
   ┌────┬────┬────┬────┐        ┌────┬────┐
-  │ {14:4s}│ {15:4s}│ {16:4s}│ {17:4s}│        │ {18:4s}│ {19:4s}│
+  │ {s14:4s}│ {s15:4s}│ {s16:4s}│ {s17:4s}│        │ {s18:4s}│ {s19:4s}│
   ├────┼────┼────┼────┼────┬────┼────┼────┤
-  │ {6:4s}│ {7:4s}│ {8:4s}│ {9:4s}│ {10:4s}│ {11:4s}│ {12:4s}│ {13:4s}│  ← shared lane
+  │ {s6:4s}│ {s7:4s}│ {s8:4s}│ {s9:4s}│ {s10:4s}│ {s11:4s}│ {s12:4s}│ {s13:4s}│  ← shared lane
   ├────┼────┼────┼────┼────┴────┼────┼────┤
-  │ {0:4s}│ {1:4s}│ {2:4s}│ {3:4s}│        │ {4:4s}│ {5:4s}│
+  │ {s0:4s}│ {s1:4s}│ {s2:4s}│ {s3:4s}│        │ {s4:4s}│ {s5:4s}│
   └────┴────┴────┴────┘        └────┴────┘
     Player 1 lane        Player 1 exit
 """
@@ -55,7 +57,7 @@ def format_board(state_vec: np.ndarray) -> str:
         label = f"{i}"
         if i in ROSETTES:
             label = f"*{i}"
-        cells[i] = label
+        cells[f"s{i}"] = label
 
     return BOARD_TEMPLATE.format(**cells)
 
